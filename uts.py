@@ -1,182 +1,161 @@
-from openpyxl import Workbook, load_workbook
+import csv
 import os
+from datetime import date
+import openpyxl
 
-# Helper untuk cek dan buat file Excel jika belum ada
-def init_excel_files():
-    if not os.path.exists("zakat_data.xlsx"):
-        wb = Workbook()
-        ws = wb.active
-        ws.append(["ID", "Nama", "Jenis Zakat", "Jumlah", "Tanggal"])
-        wb.save("zakat_data.xlsx")
-    
-    if not os.path.exists("master_beras.xlsx"):
-        wb = Workbook()
-        ws = wb.active
-        ws.append(["ID", "Nama Beras", "Harga per Kg"])
-        wb.save("master_beras.xlsx")
-        
-    if not os.path.exists("transaksi_zakat.xlsx"):
-        wb = Workbook()
-        ws = wb.active
-        ws.append(["ID", "ID Zakat", "ID Beras", "Jumlah Beras", "Total Harga", "Tanggal"])
-        wb.save("transaksi_zakat.xlsx")
+# File yang digunakan
+file_csv = "data_zakat.csv"
+file_excel = "report_zakat.xlsx"
+file_harga_beras = "harga_beras.csv"
 
-def get_next_id(file_path):
-    wb = load_workbook(file_path)
-    ws = wb.active
-    return len(ws["A"])
+# Load harga beras dari file
+def load_harga_beras():
+    harga = []
+    if os.path.exists(file_harga_beras):
+        with open(file_harga_beras, newline="") as file:
+            reader = csv.reader(file)
+            for row in reader:
+                if row:
+                    harga.append(int(row[0]))
+    return harga
 
-def add_zakat(nama, jenis_zakat, jumlah, tanggal):
-    file = "zakat_data.xlsx"
-    wb = load_workbook(file)
-    ws = wb.active
-    id = get_next_id(file)
-    ws.append([id, nama, jenis_zakat, jumlah, tanggal])
-    wb.save(file)
+# Simpan harga beras ke file
+def simpan_harga_beras(harga):
+    with open(file_harga_beras, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        for h in harga:
+            writer.writerow([h])
 
-def update_zakat(id, nama, jenis_zakat, jumlah, tanggal):
-    wb = load_workbook("zakat_data.xlsx")
-    ws = wb.active
-    for row in ws.iter_rows(min_row=2):
-        if row[0].value == id:
-            row[1].value = nama
-            row[2].value = jenis_zakat
-            row[3].value = jumlah
-            row[4].value = tanggal
-            break
-    wb.save("zakat_data.xlsx")
+# Tampilkan harga beras
+def tampilkan_harga_beras(harga_list):
+    if not harga_list:
+        print("Belum ada harga beras.")
+    for i, h in enumerate(harga_list):
+        print(f"({i+1}) Rp {h}")
 
-def delete_zakat(id):
-    wb = load_workbook("zakat_data.xlsx")
-    ws = wb.active
-    for row in ws.iter_rows(min_row=2):
-        if row[0].value == id:
-            ws.delete_rows(row[0].row)
-            break
-    wb.save("zakat_data.xlsx")
+# Tambah harga beras
+def input_harga_beras(harga_list):
+    try:
+        harga = int(input("Masukkan Harga Beras Per-Kilo: "))
+        harga_list.append(harga)
+        simpan_harga_beras(harga_list)
+    except ValueError:
+        print("Input harus angka.")
 
-def add_beras(nama_beras, harga_per_kg):
-    file = "master_beras.xlsx"
-    wb = load_workbook(file)
-    ws = wb.active
-    id = get_next_id(file)
-    ws.append([id, nama_beras, harga_per_kg])
-    wb.save(file)
+# Hapus semua harga beras
+def hapus_harga_beras():
+    if os.path.exists(file_harga_beras):
+        os.remove(file_harga_beras)
+        print("Semua data harga beras telah dihapus.")
+    else:
+        print("Tidak ada data harga beras yang perlu dihapus.")
 
-def view_master_beras():
-    wb = load_workbook("master_beras.xlsx")
-    ws = wb.active
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        print(f"ID: {row[0]}, Nama Beras: {row[1]}, Harga per Kg: {row[2]}")
+# Simpan data zakat ke file CSV
+def simpan_data_csv(data):
+    file_exists = os.path.exists(file_csv)
+    with open(file_csv, mode="a", newline="") as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(["NIK", "Nama", "Tanggal Bayar", "Harga Per-Kg", "Jumlah Kepala"])
+        for row in data:
+            writer.writerow(row)
 
-def add_transaksi_zakat(id_zakat, id_beras, jumlah_beras, tanggal):
-    # Ambil harga beras
-    wb_beras = load_workbook("master_beras.xlsx")
-    ws_beras = wb_beras.active
-    harga_per_kg = None
-    for row in ws_beras.iter_rows(min_row=2):
-        if row[0].value == id_beras:
-            harga_per_kg = row[2].value
-            break
-    if harga_per_kg is None:
-        print("ID beras tidak ditemukan.")
+# Tampilkan data zakat dari CSV
+def tampilkan_data():
+    if not os.path.exists(file_csv):
+        print("Belum ada data zakat.")
         return
-    total_harga = jumlah_beras * harga_per_kg
-    
-    file = "transaksi_zakat.xlsx"
-    wb = load_workbook(file)
+    with open(file_csv, newline="") as file:
+        reader = csv.reader(file)
+        for row in reader:
+            print(row)
+
+# Hapus semua data zakat
+def hapus_data_zakat():
+    if os.path.exists(file_csv):
+        os.remove(file_csv)
+        print("Semua data zakat berhasil dihapus.")
+    else:
+        print("Belum ada data zakat yang perlu dihapus.")
+
+# Proses pembayaran zakat
+def pembayaran_zakat(harga_list):
+    tampilkan_harga_beras(harga_list)
+    try:
+        nik = input("Masukkan NIK: ")
+        nama = input("Masukkan Nama: ")
+        id_beras = int(input("Pilih nomor harga beras: "))
+        jumlah_kepala = int(input("Masukkan Jumlah Kepala: "))
+        harga_total = harga_list[id_beras - 1] * jumlah_kepala
+        print("Total yang harus dibayar: Rp", harga_total)
+        bayar = int(input("Masukkan jumlah uang yang dibayar: "))
+        kembali = bayar - harga_total
+        print("Kembalian Anda: Rp", kembali)
+
+        data = [(nik, nama, date.today(), harga_list[id_beras - 1], jumlah_kepala)]
+        simpan_data_csv(data)
+    except (ValueError, IndexError):
+        print("Input tidak valid. Pastikan semua angka dimasukkan dengan benar.")
+
+# Export data ke Excel
+def export_to_excel():
+    if not os.path.exists(file_csv):
+        print("Tidak ada data untuk di-export.")
+        return
+
+    wb = openpyxl.Workbook()
     ws = wb.active
-    id_transaksi = get_next_id(file)
-    ws.append([id_transaksi, id_zakat, id_beras, jumlah_beras, total_harga, tanggal])
-    wb.save(file)
-    print("Transaksi zakat berhasil ditambahkan.")
+    ws.title = "Data Zakat"
 
-def view_transaksi_zakat():
-    wb_trx = load_workbook("transaksi_zakat.xlsx")
-    ws_trx = wb_trx.active
-    wb_zakat = load_workbook("zakat_data.xlsx")
-    ws_zakat = wb_zakat.active
-    wb_beras = load_workbook("master_beras.xlsx")
-    ws_beras = wb_beras.active
+    with open(file_csv, newline="") as file:
+        reader = csv.reader(file)
+        for row in reader:
+            ws.append(row)
 
-    # Buat dict bantu
-    zakat_dict = {row[0].value: (row[1].value, row[2].value) for row in ws_zakat.iter_rows(min_row=2)}
-    beras_dict = {row[0].value: row[1].value for row in ws_beras.iter_rows(min_row=2)}
+    wb.save(file_excel)
+    print(f"Data berhasil diekspor ke {file_excel}")
 
-    for row in ws_trx.iter_rows(min_row=2, values_only=True):
-        id_trx, id_zakat, id_beras, jumlah, total, tanggal = row
-        nama_zakat, jenis = zakat_dict.get(id_zakat, ("?", "?"))
-        nama_beras = beras_dict.get(id_beras, "?")
-        print(f"ID Transaksi: {id_trx}, Nama: {nama_zakat}, Jenis: {jenis}, Beras: {nama_beras}, "
-              f"Jumlah: {jumlah} kg, Total: {total}, Tanggal: {tanggal}")
-
-def input_master_beras():
-    print("\nTambah Data Master Beras")
-    nama_beras = input("Masukkan nama jenis beras: ")
-    harga_per_kg = float(input("Masukkan harga per kg: "))
-    add_beras(nama_beras, harga_per_kg)
-    print("Data master beras berhasil ditambahkan!")
-
+# Main Program
 def main():
-    init_excel_files()
-    while True:
-        print("\nMenu:")
-        print("1. Tambah Data Zakat")
-        print("2. Edit Data Zakat")
-        print("3. Hapus Data Zakat")
-        print("4. Lihat Data Master Beras")
-        print("5. Tambah Data Master Beras")
-        print("6. Tambah Transaksi Zakat")
-        print("7. Lihat Transaksi Zakat")
-        print("8. Keluar")
+    harga_beras = load_harga_beras()
 
-        choice = input("Pilih opsi (1-8): ")
-        
-        if choice == "1":
-            nama = input("Masukkan nama: ")
-            jenis_zakat = input("Masukkan jenis zakat: ")
-            jumlah = float(input("Masukkan jumlah zakat: "))
-            tanggal = input("Masukkan tanggal (YYYY-MM-DD): ")
-            add_zakat(nama, jenis_zakat, jumlah, tanggal)
-            print("Data zakat berhasil ditambahkan.")
-        
-        elif choice == "2":
-            id_zakat = int(input("Masukkan ID zakat yang ingin diubah: "))
-            nama = input("Masukkan nama baru: ")
-            jenis_zakat = input("Masukkan jenis zakat baru: ")
-            jumlah = float(input("Masukkan jumlah zakat baru: "))
-            tanggal = input("Masukkan tanggal baru (YYYY-MM-DD): ")
-            update_zakat(id_zakat, nama, jenis_zakat, jumlah, tanggal)
-            print("Data zakat berhasil diperbarui.")
-        
-        elif choice == "3":
-            id_zakat = int(input("Masukkan ID zakat yang ingin dihapus: "))
-            delete_zakat(id_zakat)
-            print("Data zakat berhasil dihapus.")
-        
-        elif choice == "4":
-            print("\nMaster Data Beras:")
-            view_master_beras()
-        
-        elif choice == "5":
-            input_master_beras()
-        
-        elif choice == "6":
-            id_zakat = int(input("Masukkan ID zakat: "))
-            id_beras = int(input("Masukkan ID beras: "))
-            jumlah_beras = float(input("Masukkan jumlah beras (kg): "))
-            tanggal = input("Masukkan tanggal (YYYY-MM-DD): ")
-            add_transaksi_zakat(id_zakat, id_beras, jumlah_beras, tanggal)
-        
-        elif choice == "7":
-            print("\nTransaksi Zakat:")
-            view_transaksi_zakat()
-        
-        elif choice == "8":
+    while True:
+        print("""
+Menu:
+1. Tampilkan Harga Beras
+2. Input Harga Beras
+3. Hapus Semua Harga Beras
+4. Tampilkan Data Zakat
+5. Pembayaran Zakat
+6. Hapus Semua Data Zakat
+7. Export ke Excel
+8. Keluar
+""")
+        pilihan = input("Pilih menu (1-8): ")
+
+        if pilihan == '1':
+            tampilkan_harga_beras(harga_beras)
+        elif pilihan == '2':
+            input_harga_beras(harga_beras)
+        elif pilihan == '3':
+            hapus_harga_beras()
+            harga_beras = []
+        elif pilihan == '4':
+            tampilkan_data()
+        elif pilihan == '5':
+            if not harga_beras:
+                print("Masukkan dulu harga beras (menu 2).")
+            else:
+                pembayaran_zakat(harga_beras)
+        elif pilihan == '6':
+            hapus_data_zakat()
+        elif pilihan == '7':
+            export_to_excel()
+        elif pilihan == '8':
             print("Keluar dari program.")
             break
-        
         else:
-            print("Pilihan tidak valid. Silakan coba lagi.")
+            print("Pilihan tidak valid.")
 
-main()
+if _name_ == "_main_":
+    main()
