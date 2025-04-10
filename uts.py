@@ -1,162 +1,136 @@
-import mysql.connector
-import pandas as pd
+from openpyxl import Workbook, load_workbook
+import os
 
-def create_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",   
-        database="zakat" 
-    )
+# Helper untuk cek dan buat file Excel jika belum ada
+def init_excel_files():
+    if not os.path.exists("zakat_data.xlsx"):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["ID", "Nama", "Jenis Zakat", "Jumlah", "Tanggal"])
+        wb.save("zakat_data.xlsx")
+    
+    if not os.path.exists("master_beras.xlsx"):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["ID", "Nama Beras", "Harga per Kg"])
+        wb.save("master_beras.xlsx")
+        
+    if not os.path.exists("transaksi_zakat.xlsx"):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["ID", "ID Zakat", "ID Beras", "Jumlah Beras", "Total Harga", "Tanggal"])
+        wb.save("transaksi_zakat.xlsx")
+
+def get_next_id(file_path):
+    wb = load_workbook(file_path)
+    ws = wb.active
+    return len(ws["A"])
 
 def add_zakat(nama, jenis_zakat, jumlah, tanggal):
-    conn = create_connection()
-    cursor = conn.cursor()
-    
-    query = "INSERT INTO zakat_data (nama, jenis_zakat, jumlah, tanggal) VALUES (%s, %s, %s, %s)"
-    cursor.execute(query, (nama, jenis_zakat, jumlah, tanggal))
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
+    file = "zakat_data.xlsx"
+    wb = load_workbook(file)
+    ws = wb.active
+    id = get_next_id(file)
+    ws.append([id, nama, jenis_zakat, jumlah, tanggal])
+    wb.save(file)
 
 def update_zakat(id, nama, jenis_zakat, jumlah, tanggal):
-    conn = create_connection()
-    cursor = conn.cursor()
-    
-    query = """UPDATE zakat_data 
-               SET nama = %s, jenis_zakat = %s, jumlah = %s, tanggal = %s 
-               WHERE id = %s"""
-    cursor.execute(query, (nama, jenis_zakat, jumlah, tanggal, id))
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
-
+    wb = load_workbook("zakat_data.xlsx")
+    ws = wb.active
+    for row in ws.iter_rows(min_row=2):
+        if row[0].value == id:
+            row[1].value = nama
+            row[2].value = jenis_zakat
+            row[3].value = jumlah
+            row[4].value = tanggal
+            break
+    wb.save("zakat_data.xlsx")
 
 def delete_zakat(id):
-    conn = create_connection()
-    cursor = conn.cursor()
-    
-    query = "DELETE FROM zakat_data WHERE id = %s"
-    cursor.execute(query, (id,))
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
+    wb = load_workbook("zakat_data.xlsx")
+    ws = wb.active
+    for row in ws.iter_rows(min_row=2):
+        if row[0].value == id:
+            ws.delete_rows(row[0].row)
+            break
+    wb.save("zakat_data.xlsx")
 
-# Fungsi untuk menambahkan data beras ke dalam master data beras
 def add_beras(nama_beras, harga_per_kg):
-    conn = create_connection()
-    cursor = conn.cursor()
-    
-    query = "INSERT INTO master_beras (nama_beras, harga_per_kg) VALUES (%s, %s)"
-    cursor.execute(query, (nama_beras, harga_per_kg))
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
+    file = "master_beras.xlsx"
+    wb = load_workbook(file)
+    ws = wb.active
+    id = get_next_id(file)
+    ws.append([id, nama_beras, harga_per_kg])
+    wb.save(file)
 
-# Fungsi untuk menampilkan data master beras
 def view_master_beras():
-    conn = create_connection()
-    cursor = conn.cursor()
-    
-    query = "SELECT * FROM master_beras"
-    cursor.execute(query)
-    result = cursor.fetchall()
-    
-    for row in result:
+    wb = load_workbook("master_beras.xlsx")
+    ws = wb.active
+    for row in ws.iter_rows(min_row=2, values_only=True):
         print(f"ID: {row[0]}, Nama Beras: {row[1]}, Harga per Kg: {row[2]}")
-    
-    cursor.close()
-    conn.close()
 
-# Fungsi untuk menambahkan transaksi zakat (beras yang didistribusikan)
 def add_transaksi_zakat(id_zakat, id_beras, jumlah_beras, tanggal):
-    conn = create_connection()
-    cursor = conn.cursor()
-    
-    # Mengecek apakah ID beras ada di database
-    query_beras = "SELECT harga_per_kg FROM master_beras WHERE id = %s"
-    cursor.execute(query_beras, (id_beras,))
-    result = cursor.fetchone()
-    
-    if result is None:
-        print("Error: ID beras tidak ditemukan!")
-        cursor.close()
-        conn.close()
+    # Ambil harga beras
+    wb_beras = load_workbook("master_beras.xlsx")
+    ws_beras = wb_beras.active
+    harga_per_kg = None
+    for row in ws_beras.iter_rows(min_row=2):
+        if row[0].value == id_beras:
+            harga_per_kg = row[2].value
+            break
+    if harga_per_kg is None:
+        print("ID beras tidak ditemukan.")
         return
+    total_harga = jumlah_beras * harga_per_kg
     
-    harga_per_kg = result[0]
-    total_harga = harga_per_kg * jumlah_beras
-    
-    query = """INSERT INTO transaksi_zakat (id_zakat, id_beras, jumlah_beras, total_harga, tanggal) 
-               VALUES (%s, %s, %s, %s, %s)"""
-    cursor.execute(query, (id_zakat, id_beras, jumlah_beras, total_harga, tanggal))
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print("Transaksi zakat berhasil ditambahkan!")
+    file = "transaksi_zakat.xlsx"
+    wb = load_workbook(file)
+    ws = wb.active
+    id_transaksi = get_next_id(file)
+    ws.append([id_transaksi, id_zakat, id_beras, jumlah_beras, total_harga, tanggal])
+    wb.save(file)
+    print("Transaksi zakat berhasil ditambahkan.")
 
-# Fungsi untuk menampilkan transaksi zakat
 def view_transaksi_zakat():
-    conn = create_connection()
-    cursor = conn.cursor()
-    
-    query = """SELECT tz.id, z.nama, z.jenis_zakat, m.nama_beras, tz.jumlah_beras, tz.total_harga, tz.tanggal
-               FROM transaksi_zakat tz
-               JOIN zakat_data z ON tz.id_zakat = z.id
-               JOIN master_beras m ON tz.id_beras = m.id"""
-    cursor.execute(query)
-    result = cursor.fetchall()
-    
-    for row in result:
-        print(f"ID Transaksi: {row[0]}, Nama Zakat: {row[1]}, Jenis Zakat: {row[2]}, Nama Beras: {row[3]}, "
-              f"Jumlah Beras: {row[4]}, Total Harga: {row[5]}, Tanggal: {row[6]}")
-    
-    cursor.close()
-    conn.close()
+    wb_trx = load_workbook("transaksi_zakat.xlsx")
+    ws_trx = wb_trx.active
+    wb_zakat = load_workbook("zakat_data.xlsx")
+    ws_zakat = wb_zakat.active
+    wb_beras = load_workbook("master_beras.xlsx")
+    ws_beras = wb_beras.active
 
-# Fungsi untuk mengekspor data zakat ke Excel
-def export_to_excel():
-    conn = create_connection()
-    query = "SELECT * FROM zakat_data"
-    
-    # Mengambil data dari database
-    zakat_data = pd.read_sql(query, conn)
-    
-    # Mengekspor data ke dalam file Excel
-    zakat_data.to_excel("data_zakat.xlsx", index=False)
-    
-    conn.close()
-    print("Data zakat berhasil diekspor ke dalam file 'data_zakat.xlsx'")
+    # Buat dict bantu
+    zakat_dict = {row[0].value: (row[1].value, row[2].value) for row in ws_zakat.iter_rows(min_row=2)}
+    beras_dict = {row[0].value: row[1].value for row in ws_beras.iter_rows(min_row=2)}
 
-# Fungsi baru untuk menambahkan data master beras melalui input
+    for row in ws_trx.iter_rows(min_row=2, values_only=True):
+        id_trx, id_zakat, id_beras, jumlah, total, tanggal = row
+        nama_zakat, jenis = zakat_dict.get(id_zakat, ("?", "?"))
+        nama_beras = beras_dict.get(id_beras, "?")
+        print(f"ID Transaksi: {id_trx}, Nama: {nama_zakat}, Jenis: {jenis}, Beras: {nama_beras}, "
+              f"Jumlah: {jumlah} kg, Total: {total}, Tanggal: {tanggal}")
+
 def input_master_beras():
     print("\nTambah Data Master Beras")
     nama_beras = input("Masukkan nama jenis beras: ")
     harga_per_kg = float(input("Masukkan harga per kg: "))
-    
     add_beras(nama_beras, harga_per_kg)
     print("Data master beras berhasil ditambahkan!")
 
-# Fungsi utama yang dimodifikasi
 def main():
+    init_excel_files()
     while True:
         print("\nMenu:")
         print("1. Tambah Data Zakat")
         print("2. Edit Data Zakat")
         print("3. Hapus Data Zakat")
         print("4. Lihat Data Master Beras")
-        print("5. Tambah Data Master Beras")  # Menu baru
+        print("5. Tambah Data Master Beras")
         print("6. Tambah Transaksi Zakat")
         print("7. Lihat Transaksi Zakat")
-        print("8. Ekspor Data Zakat ke Excel")
-        print("9. Keluar")
-        
-        choice = input("Pilih opsi (1-9): ")
+        print("8. Keluar")
+
+        choice = input("Pilih opsi (1-8): ")
         
         if choice == "1":
             nama = input("Masukkan nama: ")
@@ -167,7 +141,6 @@ def main():
             print("Data zakat berhasil ditambahkan.")
         
         elif choice == "2":
-            
             id_zakat = int(input("Masukkan ID zakat yang ingin diubah: "))
             nama = input("Masukkan nama baru: ")
             jenis_zakat = input("Masukkan jenis zakat baru: ")
@@ -185,7 +158,7 @@ def main():
             print("\nMaster Data Beras:")
             view_master_beras()
         
-        elif choice == "5":  # Opsi baru untuk input master beras
+        elif choice == "5":
             input_master_beras()
         
         elif choice == "6":
@@ -200,9 +173,6 @@ def main():
             view_transaksi_zakat()
         
         elif choice == "8":
-            export_to_excel()
-        
-        elif choice == "9":
             print("Keluar dari program.")
             break
         
